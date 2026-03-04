@@ -21,3 +21,7 @@ class AgentState(TypedDict):
     root_cause: str
     files_to_edit: list[str]
     fix_approach: str
+
+    # Fix fills these
+    proposed_fix: dict[str, str]
+    diff: dict[str, str]

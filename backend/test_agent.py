@@ -1,6 +1,7 @@
 from agents.fetch_issue import fetch_issue_agent
 from agents.research import research_agent
 from agents.planner import planner_agent
+from agents.fix import fix_agent
 
 state = {
     "issue_url": "https://github.com/facebook/react/issues/1",
@@ -15,7 +16,9 @@ state = {
     "file_contents": {},
     "root_cause": "",
     "files_to_edit": [],
-    "fix_approach": ""
+    "fix_approach": "",
+    "proposed_fix": {},
+    "diff": {}
 }
 
 # Agent 1
@@ -30,6 +33,14 @@ print(f"Relevant files: {state['relevant_files']}")
 # Agent 3
 state = planner_agent(state)
 print(f"\n✅ Agent 3 done")
-print(f"Root cause: {state['root_cause']}")
 print(f"Files to edit: {state['files_to_edit']}")
-print(f"Fix approach:\n{state['fix_approach']}")
+
+# Agent 4
+state = fix_agent(state)
+print(f"\n✅ Agent 4 done")
+print(f"Fixed files: {list(state['proposed_fix'].keys())}")
+
+# Print diff for each file
+for file_path, file_diff in state["diff"].items():
+    print(f"\n--- Diff for {file_path} ---")
+    print(file_diff[:500])
