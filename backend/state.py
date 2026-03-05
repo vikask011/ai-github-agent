@@ -30,3 +30,7 @@ class AgentState(TypedDict):
     test_passed: bool
     test_output: str
     retry_count: int
+
+    # PR Creator fills these
+    pr_url: str
+    branch_name: str
