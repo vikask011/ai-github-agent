@@ -193,8 +193,7 @@ def check_repo_has_files(repo_name: str) -> dict:
         # Added .html .css .scss .sass
         code_extensions = (
             ".py", ".js", ".ts", ".jsx", ".tsx",
-            ".java", ".cpp", ".c", ".go", ".rb",
-            ".html", ".css", ".scss", ".sass"
+            ".java", ".cpp", ".c", ".go", ".rb"
         )
 
         has_code = False

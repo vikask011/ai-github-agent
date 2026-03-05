@@ -7,6 +7,5 @@ python-dotenv
 pydantic
 httpx
 requests
-flib
 docker
 langgraph
