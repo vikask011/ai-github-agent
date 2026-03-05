@@ -4,6 +4,7 @@ from agents.fetch_issue import fetch_issue_agent
 from agents.research import research_agent
 from agents.planner import planner_agent
 from agents.fix import fix_agent
+from agents.test_runner import test_runner_agent
 from state import AgentState
 from dotenv import load_dotenv
 
@@ -30,7 +31,10 @@ def get_initial_state(issue_url: str) -> AgentState:
         "files_to_edit": [],
         "fix_approach": "",
         "proposed_fix": {},
-        "diff": {}
+        "diff": {},
+        "test_passed": False,
+        "test_output": "",
+        "retry_count": 0
     }
 
 @app.get("/")
@@ -94,5 +98,22 @@ def fix(request: IssueRequest):
                 for path, diff
                 in state["diff"].items()
             }
+        }
+    }
+
+@app.post("/test")
+def test(request: IssueRequest):
+    state = get_initial_state(request.issue_url)
+    state = fetch_issue_agent(state)
+    state = research_agent(state)
+    state = planner_agent(state)
+    state = fix_agent(state)
+    state = test_runner_agent(state)
+    return {
+        "status": "success",
+        "data": {
+            "test_passed": state["test_passed"],
+            "test_output": state["test_output"],
+            "retry_count": state["retry_count"]
         }
     }

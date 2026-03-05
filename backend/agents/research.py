@@ -16,26 +16,46 @@ def extract_keywords(issue_title: str, issue_body: str) -> list[str]:
     
     No explanation. Just the JSON array.
     """
-    
     response = call_sarvam(prompt)
-    
     response = response.strip()
     if "```" in response:
         response = response.split("```")[1]
         if response.startswith("json"):
             response = response[4:]
-    
     try:
-        keywords = json.loads(response)
-        return keywords
+        return json.loads(response)
     except:
         return issue_title.lower().split()
+
+
+def get_all_repo_files(repo_name: str) -> list[str]:
+    # Get ALL files directly from repo
+    # No search needed — works for small repos
+    repo = get_repo(repo_name)
+    contents = repo.get_contents("")
+    files = []
+
+    while contents:
+        file_content = contents.pop(0)
+        if file_content.type == "dir":
+            # Go into subdirectories
+            contents.extend(repo.get_contents(file_content.path))
+        else:
+            # Only include code files
+            if file_content.path.endswith((
+                ".py", ".js", ".ts", ".java",
+                ".go", ".rb", ".cpp", ".c"
+            )):
+                files.append(file_content.path)
+
+    return files
 
 
 def search_relevant_files(repo_name: str, keywords: list[str]) -> list[str]:
     relevant_files = []
     seen = set()
 
+    # First try GitHub code search
     for keyword in keywords[:5]:
         try:
             results = search_code_in_repo(repo_name, keyword)
@@ -47,6 +67,12 @@ def search_relevant_files(repo_name: str, keywords: list[str]) -> list[str]:
         except Exception as e:
             print(f"⚠️ Search failed for '{keyword}': {e}")
             continue
+
+    # If search returned nothing → get all repo files directly
+    if not relevant_files:
+        print("⚠️ Search returned empty. Getting all repo files directly...")
+        relevant_files = get_all_repo_files(repo_name)
+        print(f"✅ Found {len(relevant_files)} files in repo")
 
     return relevant_files[:10]
 
@@ -80,20 +106,22 @@ def pick_most_relevant_files(
     Title: {issue_title}
     Body: {issue_body}
     
-    These files were found in the codebase:
+    These files exist in the codebase:
     {file_list}
     
-    Pick the TOP 3 most relevant files 
+    Pick the TOP 3 most relevant files
     that likely need to be changed to fix this issue.
     
-    Return ONLY a JSON array of file paths like:
-    ["path/to/file1.py", "path/to/file2.py"]
+    IMPORTANT: Only return file paths from the list above.
+    Do not make up or guess file paths.
+    
+    Return ONLY a JSON array like:
+    ["exact/path/from/above.py"]
     
     No explanation. Just the JSON array.
     """
 
     response = call_sarvam(prompt)
-
     response = response.strip()
     if "```" in response:
         response = response.split("```")[1]
@@ -102,7 +130,15 @@ def pick_most_relevant_files(
 
     try:
         top_files = json.loads(response)
-        return top_files
+        # Validate — only return files that actually exist
+        valid_files = [
+            f for f in top_files
+            if f in file_contents
+        ]
+        # If validation fails fallback to all files
+        if not valid_files:
+            return list(file_contents.keys())[:3]
+        return valid_files
     except:
         return list(file_contents.keys())[:3]
 

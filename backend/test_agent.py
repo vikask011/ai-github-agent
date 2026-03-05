@@ -2,9 +2,10 @@ from agents.fetch_issue import fetch_issue_agent
 from agents.research import research_agent
 from agents.planner import planner_agent
 from agents.fix import fix_agent
+from agents.test_runner import test_runner_agent
 
 state = {
-    "issue_url": "https://github.com/facebook/react/issues/1",
+    "issue_url": "https://github.com/vikask011/test-agent-repo/issues/1",
     "issue_title": "",
     "issue_body": "",
     "issue_labels": [],
@@ -18,7 +19,10 @@ state = {
     "files_to_edit": [],
     "fix_approach": "",
     "proposed_fix": {},
-    "diff": {}
+    "diff": {},
+    "test_passed": False,
+    "test_output": "",
+    "retry_count": 0
 }
 
 # Agent 1
@@ -40,7 +44,8 @@ state = fix_agent(state)
 print(f"\n✅ Agent 4 done")
 print(f"Fixed files: {list(state['proposed_fix'].keys())}")
 
-# Print diff for each file
-for file_path, file_diff in state["diff"].items():
-    print(f"\n--- Diff for {file_path} ---")
-    print(file_diff[:500])
+# Agent 5
+state = test_runner_agent(state)
+print(f"\n✅ Agent 5 done")
+print(f"Tests passed: {state['test_passed']}")
+print(f"Output:\n{state['test_output']}")

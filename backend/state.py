@@ -25,3 +25,8 @@ class AgentState(TypedDict):
     # Fix fills these
     proposed_fix: dict[str, str]
     diff: dict[str, str]
+
+    # Test Runner fills these
+    test_passed: bool
+    test_output: str
+    retry_count: int

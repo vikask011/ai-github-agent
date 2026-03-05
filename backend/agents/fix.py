@@ -12,7 +12,7 @@ def generate_fix_for_file(
 
     prompt = f"""
     You are a senior software engineer.
-    Your job is to fix a bug in this file.
+    Fix the bug in this file.
     
     Issue: {issue_title}
     Root Cause: {root_cause}
@@ -21,23 +21,25 @@ def generate_fix_for_file(
     {fix_approach}
     
     Current code in {file_path}:
-    {current_code[:3000]}
+    {current_code}
     
-    Rewrite the COMPLETE file with the fix applied.
-    Return ONLY the fixed code.
-    No explanation.
-    No markdown.
-    No code blocks.
-    Just the raw code itself.
+    Rules:
+    - Return the COMPLETE fixed file
+    - Keep ALL existing imports exactly as they are
+    - Keep ALL existing functions
+    - Only change what is needed to fix the bug
+    - Return ONLY raw code
+    - No markdown, no explanation, no code blocks
+    - No triple backticks
+    - First line must be valid Python code
     """
 
     fixed_code = call_sarvam(prompt)
 
-    # Clean response — remove markdown if present
+    # Clean response
     fixed_code = fixed_code.strip()
     if fixed_code.startswith("```"):
         lines = fixed_code.split("\n")
-        # Remove first and last lines (``` markers)
         fixed_code = "\n".join(lines[1:-1])
 
     return fixed_code
@@ -71,7 +73,6 @@ def fix_agent(state: AgentState) -> AgentState:
 
     for file_path in state["files_to_edit"]:
 
-        # Check if we have the file contents
         if file_path not in state["file_contents"]:
             print(f"⚠️ Skipping {file_path} — content not available")
             continue
@@ -80,7 +81,6 @@ def fix_agent(state: AgentState) -> AgentState:
 
         current_code = state["file_contents"][file_path]
 
-        # Step 1 — Generate fix
         fixed_code = generate_fix_for_file(
             file_path=file_path,
             current_code=current_code,
@@ -89,7 +89,12 @@ def fix_agent(state: AgentState) -> AgentState:
             issue_title=state["issue_title"]
         )
 
-        # Step 2 — Generate diff
+        # Safety check — if first line looks wrong reuse original
+        first_line = fixed_code.split("\n")[0].strip()
+        if first_line.endswith(".py"):
+            print(f"⚠️ Bad output detected for {file_path}. Keeping original.")
+            fixed_code = current_code
+
         file_diff = generate_diff(
             file_path=file_path,
             original_code=current_code,
@@ -108,3 +113,4 @@ def fix_agent(state: AgentState) -> AgentState:
         "proposed_fix": proposed_fix,
         "diff": diff
     }
+
