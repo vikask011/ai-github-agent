@@ -1,30 +1,44 @@
 # AI GitHub Agent
 
-## Workflow
-This project is designed to automate interactions with GitHub using AI. It leverages machine learning algorithms to process GitHub data and provide insights or perform actions based on specific triggers.
+## What It Does
+AI GitHub Agent automates interactions with GitHub, enabling developers to manage repositories, issues, and pull requests efficiently through AI-driven commands.
+
+## Architecture
+The architecture of AI GitHub Agent is modular and consists of various components that manage requests, authentication, data processing, and user interaction.
 
 ## Tech Stack
-- Node.js
-- Express.js
-- MongoDB
-- GitHub API
-- Docker
+- **Languages**: Python, JavaScript
+- **Frameworks**: Flask, React
+- **Database**: PostgreSQL
+- **Cloud**: AWS
 
-## Setup Instructions
-1. Clone the repository: `git clone https://github.com/vikask011/ai-github-agent.git`
-2. Navigate to the project directory: `cd ai-github-agent`
-3. Install dependencies: `npm install`
-4. Set up your environment variables as shown in the `.env.example` file.
-5. Start the application: `npm start`
-
-## API Endpoints
-- **GET** `/api/v1/repos`: Fetch repository details.
-- **POST** `/api/v1/actions`: Trigger an action on a repository.
-
-## Notes
-Ensure you have set the required API keys in your environment variables to interact with GitHub API successfully.
+## Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/vikask011/ai-github-agent.git
+   cd ai-github-agent
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Set up environment variables by creating a `.env` file and adding your GitHub API credentials.
 
 ## Environment Variables
 - `GITHUB_TOKEN`: Your GitHub personal access token.
-- `MONGO_URI`: Connection string for MongoDB.
-- `PORT`: Server port (default is 3000).
+- `FLASK_ENV`: Set to `development` for local development.
+
+## API Endpoints
+- `GET /api/repos`: List all repositories.
+- `POST /api/issues`: Create a new issue.
+- `PUT /api/pulls`: Update a pull request.
+
+## Requirements
+- Python 3.8+
+- Flask
+- PostgreSQL
+- Requests library
+
+## Notes
+- Make sure to handle API rate limits when making requests to GitHub's API.
+- Always validate user input to avoid security vulnerabilities.
