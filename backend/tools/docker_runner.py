@@ -3,14 +3,51 @@ import os
 import tempfile
 import shutil
 
+_base_image_built = False
+
+def ensure_base_image(client, dockerfile_path: str):
+    global _base_image_built
+
+    if _base_image_built:
+        return
+
+    try:
+        client.images.get("agent-base:latest")
+        print("✅ Base image already exists")
+        _base_image_built = True
+        return
+    except:
+        pass
+
+    print("🐳 Building base image (one time only)...")
+    temp_dir = tempfile.mkdtemp()
+    shutil.copy(dockerfile_path, os.path.join(temp_dir, "Dockerfile"))
+
+    client.images.build(
+        path=temp_dir,
+        tag="agent-base:latest",
+        rm=True,
+        nocache=False
+    )
+    shutil.rmtree(temp_dir)
+    print("✅ Base image ready")
+    _base_image_built = True
+
+
 def run_tests_in_docker(
     proposed_fix: dict[str, str],
     original_files: dict[str, str],
-    test_command: list[str] = ["pytest", ".", "-v"]
 ) -> dict:
 
     client = docker.from_env()
     temp_dir = None
+
+    dockerfile_path = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            "../../sandbox/Dockerfile"
+        )
+    )
 
     try:
         # Step 1 — Create temp directory
@@ -21,7 +58,7 @@ def run_tests_in_docker(
         for file_path, content in original_files.items():
             filename = os.path.basename(file_path)
             full_path = os.path.join(temp_dir, filename)
-            with open(full_path, "w") as f:
+            with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             print(f"📄 Written original: {filename}")
 
@@ -29,58 +66,52 @@ def run_tests_in_docker(
         for file_path, content in proposed_fix.items():
             filename = os.path.basename(file_path)
             full_path = os.path.join(temp_dir, filename)
-            with open(full_path, "w") as f:
+            with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
             print(f"✅ Written fix: {filename}")
 
         # Step 4 — Copy Dockerfile
-        dockerfile_path = os.path.abspath(
-            os.path.join(
-                os.path.dirname(__file__),
-                "../../sandbox/Dockerfile"
-            )
+        shutil.copy(
+            dockerfile_path,
+            os.path.join(temp_dir, "Dockerfile")
         )
-        shutil.copy(dockerfile_path, temp_dir)
         print("📄 Copied Dockerfile")
 
-        # Step 5 — Build Docker image
-        print("🐳 Building Docker image...")
-        image, build_logs = client.images.build(
+        # Step 5 — Ensure base image built once
+        ensure_base_image(client, dockerfile_path)
+
+        # Step 6 — Build test image
+        print("🐳 Building test image...")
+        image, _ = client.images.build(
             path=temp_dir,
             tag="agent-test:latest",
-            rm=True
+            rm=True,
+            nocache=False
         )
-        print("✅ Docker image built")
+        print("✅ Test image built")
 
-        # Step 6 — Run container
-        # KEY FIX: dont use remove=True
-        # instead manually remove after reading logs
+        # Step 7 — Run container
         print("🚀 Running tests in Docker...")
         container = client.containers.run(
             "agent-test:latest",
-            command=test_command,
-            detach=True,        # run in background
+            detach=True,
             stdout=True,
             stderr=True
         )
 
-        # Wait for container to finish
         result = container.wait()
         exit_code = result["StatusCode"]
 
-        # Get ALL logs including errors
         output = container.logs(
             stdout=True,
             stderr=True
         ).decode("utf-8")
 
-        # Now remove container
         container.remove()
 
         print(f"📋 Exit code: {exit_code}")
         print(f"📋 Test output:\n{output}")
 
-        # passed = exit code 0
         passed = exit_code == 0
 
         return {

@@ -29,27 +29,33 @@ def extract_keywords(issue_title: str, issue_body: str) -> list[str]:
 
 
 def get_all_repo_files(repo_name: str) -> list[str]:
-    # Get ALL files directly from repo
-    # No search needed — works for small repos
     repo = get_repo(repo_name)
     contents = repo.get_contents("")
+
+    if not isinstance(contents, list):
+        contents = [contents]
+
     files = []
+    code_extensions = (
+        ".py", ".js", ".ts", ".jsx", ".tsx",
+        ".java", ".cpp", ".c", ".go", ".rb",
+        ".html", ".css", ".scss", ".sass"
+    )
 
     while contents:
         file_content = contents.pop(0)
         if file_content.type == "dir":
-            # Go into subdirectories
-            contents.extend(repo.get_contents(file_content.path))
-        else:
-            # Only include code files
-            if file_content.path.endswith((
-                ".py", ".js", ".ts", ".java",
-                ".go", ".rb", ".cpp", ".c"
-            )):
-                files.append(file_content.path)
+            try:
+                sub = repo.get_contents(file_content.path)
+                if not isinstance(sub, list):
+                    sub = [sub]
+                contents.extend(sub)
+            except:
+                continue
+        elif file_content.path.endswith(code_extensions):
+            files.append(file_content.path)
 
     return files
-
 
 def search_relevant_files(repo_name: str, keywords: list[str]) -> list[str]:
     relevant_files = []
@@ -160,11 +166,39 @@ def research_agent(state: AgentState) -> AgentState:
     )
     print(f"✅ Found files: {relevant_files}")
 
+    # If still empty — get ALL repo files directly
+    if not relevant_files:
+        print("⚠️ No files found. Reading all repo files...")
+        relevant_files = get_all_repo_files(
+            state["repo_name"]
+        )
+        print(f"✅ Repo files: {relevant_files}")
+
+    # If STILL empty — nothing to work with
+    if not relevant_files:
+        print("❌ Repository has no files")
+        return {
+            **state,
+            "keywords": keywords,
+            "relevant_files": [],
+            "file_contents": {}
+        }
+
     print("📖 Reading file contents...")
     file_contents = read_file_contents(
         state["repo_name"],
         relevant_files
     )
+
+    # If no contents read — stop here
+    if not file_contents:
+        print("❌ Could not read any file contents")
+        return {
+            **state,
+            "keywords": keywords,
+            "relevant_files": relevant_files,
+            "file_contents": {}
+        }
 
     print("🧠 Picking most relevant files...")
     top_files = pick_most_relevant_files(
@@ -180,9 +214,14 @@ def research_agent(state: AgentState) -> AgentState:
         if path in file_contents
     }
 
+    # Fallback — if AI picked nothing use all files
+    if not top_file_contents:
+        print("⚠️ AI picked no files. Using all files.")
+        top_file_contents = file_contents
+
     return {
         **state,
         "keywords": keywords,
-        "relevant_files": top_files,
+        "relevant_files": list(top_file_contents.keys()),
         "file_contents": top_file_contents
     }

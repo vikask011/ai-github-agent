@@ -2,17 +2,51 @@ from tools.sarvam_client import call_sarvam
 from state import AgentState
 import difflib
 
+def clean_code_response(response: str) -> str:
+    response = response.strip()
+    if "```" in response:
+        lines = response.split("\n")
+        cleaned = []
+        inside_block = False
+        for line in lines:
+            if line.strip().startswith("```"):
+                inside_block = not inside_block
+                continue
+            if not inside_block:
+                cleaned.append(line)
+        response = "\n".join(cleaned).strip()
+    return response
+
+
+def is_valid_python(code: str) -> bool:
+    try:
+        compile(code, "<string>", "exec")
+        return True
+    except SyntaxError:
+        return False
+
+
 def generate_fix_for_file(
     file_path: str,
     current_code: str,
     fix_approach: str,
     root_cause: str,
-    issue_title: str
+    issue_title: str,
+    previous_error: str = ""
 ) -> str:
+
+    error_context = ""
+    if previous_error:
+        error_context = f"""
+    PREVIOUS ATTEMPT FAILED WITH THIS ERROR:
+    {previous_error}
+    
+    Fix these specific errors in this attempt.
+    """
 
     prompt = f"""
     You are a senior software engineer.
-    Fix the bug in this file.
+    Fix the bug in this Python file.
     
     Issue: {issue_title}
     Root Cause: {root_cause}
@@ -23,24 +57,29 @@ def generate_fix_for_file(
     Current code in {file_path}:
     {current_code}
     
-    Rules:
-    - Return the COMPLETE fixed file
+    {error_context}
+    
+    CRITICAL RULES:
+    - Return the COMPLETE file
     - Keep ALL existing imports exactly as they are
     - Keep ALL existing functions
     - Only change what is needed to fix the bug
-    - Return ONLY raw code
-    - No markdown, no explanation, no code blocks
-    - No triple backticks
-    - First line must be valid Python code
+    - Return ONLY raw Python code
+    - No markdown, no backticks, no explanation
+    - First line must be valid Python
     """
 
     fixed_code = call_sarvam(prompt)
+    fixed_code = clean_code_response(fixed_code)
 
-    # Clean response
-    fixed_code = fixed_code.strip()
-    if fixed_code.startswith("```"):
-        lines = fixed_code.split("\n")
-        fixed_code = "\n".join(lines[1:-1])
+    if not is_valid_python(fixed_code):
+        print(f"⚠️ Invalid Python generated. Keeping original.")
+        return current_code
+
+    first_line = fixed_code.split("\n")[0].strip()
+    if first_line.endswith(".py"):
+        print(f"⚠️ Bad output detected. Keeping original.")
+        return current_code
 
     return fixed_code
 
@@ -71,10 +110,12 @@ def fix_agent(state: AgentState) -> AgentState:
     proposed_fix = {}
     diff = {}
 
+    previous_error = state.get("test_output", "")
+
     for file_path in state["files_to_edit"]:
 
         if file_path not in state["file_contents"]:
-            print(f"⚠️ Skipping {file_path} — content not available")
+            print(f"⚠️ Skipping {file_path} — not available")
             continue
 
         print(f"✍️ Fixing file: {file_path}")
@@ -86,14 +127,9 @@ def fix_agent(state: AgentState) -> AgentState:
             current_code=current_code,
             fix_approach=state["fix_approach"],
             root_cause=state["root_cause"],
-            issue_title=state["issue_title"]
+            issue_title=state["issue_title"],
+            previous_error=previous_error
         )
-
-        # Safety check — if first line looks wrong reuse original
-        first_line = fixed_code.split("\n")[0].strip()
-        if first_line.endswith(".py"):
-            print(f"⚠️ Bad output detected for {file_path}. Keeping original.")
-            fixed_code = current_code
 
         file_diff = generate_diff(
             file_path=file_path,
@@ -113,4 +149,3 @@ def fix_agent(state: AgentState) -> AgentState:
         "proposed_fix": proposed_fix,
         "diff": diff
     }
-

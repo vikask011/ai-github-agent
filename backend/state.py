@@ -17,6 +17,10 @@ class AgentState(TypedDict):
     relevant_files: list[str]
     file_contents: dict[str, str]
 
+    # Validator fills these
+    should_proceed: bool
+    skip_reason: str
+
     # Planner fills these
     root_cause: str
     files_to_edit: list[str]

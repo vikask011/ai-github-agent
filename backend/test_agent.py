@@ -1,12 +1,8 @@
-from agents.fetch_issue import fetch_issue_agent
-from agents.research import research_agent
-from agents.planner import planner_agent
-from agents.fix import fix_agent
-from agents.test_runner import test_runner_agent
-from agents.pr_creator import pr_creator_agent
+from graph import graph
+import uuid
 
 state = {
-    "issue_url": "https://github.com/vikask011/test-agent-repo/issues/1",
+    "issue_url": "https://github.com/vikask011/test2/issues/1",
     "issue_title": "",
     "issue_body": "",
     "issue_labels": [],
@@ -21,6 +17,8 @@ state = {
     "fix_approach": "",
     "proposed_fix": {},
     "diff": {},
+    "should_proceed": True,
+    "skip_reason": "",
     "test_passed": False,
     "test_output": "",
     "retry_count": 0,
@@ -28,31 +26,63 @@ state = {
     "branch_name": ""
 }
 
-# Agent 1
-state = fetch_issue_agent(state)
-print(f"\n✅ Agent 1 done: {state['issue_title']}")
+thread_id = str(uuid.uuid4())
+config = {"configurable": {"thread_id": thread_id}}
 
-# Agent 2
-state = research_agent(state)
-print(f"\n✅ Agent 2 done")
-print(f"Relevant files: {state['relevant_files']}")
+print("🚀 Starting AI GitHub Agent...\n")
 
-# Agent 3
-state = planner_agent(state)
-print(f"\n✅ Agent 3 done")
-print(f"Files to edit: {state['files_to_edit']}")
+result = graph.invoke(state, config)
 
-# Agent 4
-state = fix_agent(state)
-print(f"\n✅ Agent 4 done")
-print(f"Fixed files: {list(state['proposed_fix'].keys())}")
+print("\n" + "="*50)
 
-# Agent 5
-state = test_runner_agent(state)
-print(f"\n✅ Agent 5 done")
-print(f"Tests passed: {state['test_passed']}")
+# Case 1 — Validator stopped the graph
+if not result.get("should_proceed", True):
+    # Show correct message based on reason
+    reason = result["skip_reason"]
 
-# Agent 6
-state = pr_creator_agent(state)
-print(f"\n✅ Agent 6 done")
-print(f"PR URL: {state['pr_url']}")
+    if "already" in reason.lower() or \
+       "merged" in reason.lower() or \
+       "closed" in reason.lower():
+        print("✅ STOPPED — Issue Already Fixed")
+    elif "not a code bug" in reason.lower():
+        print("⚠️ STOPPED — Not A Fixable Code Issue")
+    elif "no code files" in reason.lower():
+        print("⚠️ STOPPED — No Code Files In Repo")
+    else:
+        print("🛑 STOPPED — Cannot Process Issue")
+
+    print("="*50)
+    print(f"Reason: {reason}")
+    print("\nNo action taken. Exiting.")
+    exit()
+
+# Case 2 — Tests failed after max retries
+if not result["test_passed"]:
+    print("❌ STOPPED — Could not fix the issue")
+    print("="*50)
+    print(f"Test Output:\n{result['test_output'][:300]}")
+    exit()
+
+# Case 3 — Tests passed, ask for approval
+print("⏸️  PAUSED — Waiting for your approval")
+print("="*50)
+print(f"Title:        {result['issue_title']}")
+print(f"Root Cause:   {result['root_cause'][:150]}")
+print(f"Files Fixed:  {list(result['proposed_fix'].keys())}")
+print(f"Tests Passed: {result['test_passed']}")
+print(f"\nTest Output:\n{result['test_output'][:300]}")
+
+print("\n" + "="*50)
+approval = input("👤 Create Pull Request? (yes/no): ")
+
+if approval.lower() == "yes":
+    print("\n▶️  Resuming → Creating PR...")
+    final = graph.invoke(None, config)
+    print("\n" + "="*50)
+    print("🏁 DONE")
+    print("="*50)
+    print(f"PR URL: {final['pr_url']}")
+    print("\nOpen the link above to review your PR.")
+else:
+    print("\n❌ PR creation cancelled.")
+    print("No changes were made to the repository.")
