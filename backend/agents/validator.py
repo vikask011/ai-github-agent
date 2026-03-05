@@ -36,9 +36,7 @@ def check_issue_is_fixable(
     - npm/pip install errors on local machine
     - Permission errors on local machine
     - Hardware issues
-    - Missing package.json on local machine
     - Local configuration problems
-    - "works on my machine" type issues
     
     IS fixable examples:
     - Bug in a function
@@ -46,9 +44,8 @@ def check_issue_is_fixable(
     - Wrong logic in algorithm
     - Missing feature in existing code
     - Failing test cases
-    - Security vulnerability in code
-    
-    
+    - UI/CSS bugs in code files
+    - HTML structure issues in repo files
     
     Return ONLY a JSON object:
     {{
@@ -68,7 +65,6 @@ def check_issue_is_fixable(
             "is_fixable": True,
             "reason": "Could not determine — proceeding"
         }
-
 
 def check_issue_already_fixed(
     repo_name: str,
@@ -193,7 +189,8 @@ def check_repo_has_files(repo_name: str) -> dict:
         # Added .html .css .scss .sass
         code_extensions = (
             ".py", ".js", ".ts", ".jsx", ".tsx",
-            ".java", ".cpp", ".c", ".go", ".rb"
+            ".java", ".cpp", ".c", ".go", ".rb",
+            ".html", ".css", ".scss", ".sass"
         )
 
         has_code = False

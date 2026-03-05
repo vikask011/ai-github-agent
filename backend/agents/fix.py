@@ -40,13 +40,12 @@ def generate_fix_for_file(
         error_context = f"""
     PREVIOUS ATTEMPT FAILED WITH THIS ERROR:
     {previous_error}
-    
     Fix these specific errors in this attempt.
     """
 
     prompt = f"""
     You are a senior software engineer.
-    Fix the bug in this Python file.
+    Fix the bug in this file.
     
     Issue: {issue_title}
     Root Cause: {root_cause}
@@ -61,28 +60,26 @@ def generate_fix_for_file(
     
     CRITICAL RULES:
     - Return the COMPLETE file
-    - Keep ALL existing imports exactly as they are
-    - Keep ALL existing functions
+    - Keep ALL existing code structure
     - Only change what is needed to fix the bug
-    - Return ONLY raw Python code
+    - Return ONLY raw code
     - No markdown, no backticks, no explanation
-    - First line must be valid Python
     """
 
     fixed_code = call_sarvam(prompt)
     fixed_code = clean_code_response(fixed_code)
 
-    if not is_valid_python(fixed_code):
-        print(f"⚠️ Invalid Python generated. Keeping original.")
-        return current_code
-
-    first_line = fixed_code.split("\n")[0].strip()
-    if first_line.endswith(".py"):
-        print(f"⚠️ Bad output detected. Keeping original.")
-        return current_code
+    # Only validate Python files
+    if file_path.endswith(".py"):
+        if not is_valid_python(fixed_code):
+            print(f"⚠️ Invalid Python generated. Keeping original.")
+            return current_code
+        first_line = fixed_code.split("\n")[0].strip()
+        if first_line.endswith(".py"):
+            print(f"⚠️ Bad output detected. Keeping original.")
+            return current_code
 
     return fixed_code
-
 
 def generate_diff(
     file_path: str,
