@@ -1,6 +1,7 @@
 import httpx
 import time
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,7 +34,19 @@ def call_sarvam(prompt: str, retries: int = 3) -> str:
                 timeout=120.0
             )
             response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+            raw = response.json()["choices"][0]["message"]["content"]
+
+            # Remove closed <think>...</think> blocks
+            content = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
+            # Remove unclosed <think>... (everything from <think> to end of string)
+            content = re.sub(r"<think>.*$", "", content, flags=re.DOTALL)
+            content = content.strip()
+
+            # If nothing left, the entire response was inside <think> — strip the tag and use what's inside
+            if not content:
+                content = re.sub(r"^\s*<think>\s*", "", raw).strip()
+
+            return content
 
         except httpx.TimeoutException:
             if attempt < retries - 1:

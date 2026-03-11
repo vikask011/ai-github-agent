@@ -100,9 +100,13 @@ export default function Home() {
       try {
         const res = await fetch(`${API_BASE}/status/${tid}`);
         const data = await res.json();
-        if (data.status === "done" || data.status === "error") {
+        if (data.status === "done") {
           clearInterval(pollRef.current!);
           onDone(data.result);
+        } else if (data.status === "error") {
+          clearInterval(pollRef.current!);
+          // data.result may contain {status: "error", message: "..."}
+          onDone(data.result ?? { status: "error", message: "Unknown error from agent." });
         }
       } catch (e) {
         clearInterval(pollRef.current!);
@@ -148,6 +152,9 @@ export default function Home() {
           setStage("already_fixed");
         } else if (finalResult.status === "fix_failed") {
           setStage("fix_failed");
+        } else if (finalResult.status === "error") {
+          setErrorDetail(finalResult.message || "Agent encountered an error.");
+          setStage("error");
         } else {
           setErrorDetail("Unexpected status: " + finalResult.status);
           setStage("error");
@@ -176,7 +183,15 @@ export default function Home() {
       startLogStream(threadId);
       pollStatus(threadId, (finalResult) => {
         setResult((prev) => ({ ...prev!, ...finalResult }));
-        setStage(finalResult.status === "success" ? "success" : "error");
+        if (finalResult.status === "success") {
+          setStage("success");
+        } else if (finalResult.status === "error") {
+          setErrorDetail(finalResult.message || "PR creation failed.");
+          setStage("error");
+        } else {
+          setErrorDetail("Unexpected status: " + finalResult.status);
+          setStage("error");
+        }
       });
     } catch (e) {
       setErrorDetail("Approve failed: " + String(e));
@@ -254,6 +269,7 @@ export default function Home() {
                 placeholder="https://github.com/owner/repo/issues/42"
                 disabled={stage !== "idle"}
                 className="w-full bg-[#111118] border border-[#1e1e2e] rounded-lg pl-8 pr-4 py-3 text-sm text-white placeholder-[#333] focus:outline-none focus:border-[#00ff9d] focus:ring-1 focus:ring-[#00ff9d] disabled:opacity-40 transition-colors"
+                suppressHydrationWarning
               />
             </div>
             {stage === "idle" ? (
@@ -464,7 +480,12 @@ export default function Home() {
                 {errorDetail}
               </pre>
             )}
-            {!errorDetail && (
+            {result?.message && !errorDetail && (
+              <pre className="text-[11px] text-[#ff6666] leading-relaxed whitespace-pre-wrap break-all mt-2">
+                {result.message}
+              </pre>
+            )}
+            {!errorDetail && !result?.message && (
               <div className="text-[#555] text-xs">
                 Make sure your backend is running at <code className="text-[#ff6666]">{API_BASE}</code>
               </div>

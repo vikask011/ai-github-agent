@@ -1,9 +1,13 @@
 from tools.sarvam_client import call_sarvam
 from state import AgentState
 import difflib
+import re
+
+def strip_think_tags(text: str) -> str:
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 def clean_code_response(response: str) -> str:
-    response = response.strip()
+    response = strip_think_tags(response)
     if "```" in response:
         lines = response.split("\n")
         cleaned = []
@@ -34,6 +38,9 @@ def generate_fix_for_file(
     issue_title: str,
     previous_error: str = ""
 ) -> str:
+
+    root_cause = strip_think_tags(root_cause)
+    fix_approach = strip_think_tags(fix_approach)
 
     error_context = ""
     if previous_error:
@@ -69,17 +76,17 @@ def generate_fix_for_file(
     fixed_code = call_sarvam(prompt)
     fixed_code = clean_code_response(fixed_code)
 
-    # Only validate Python files
     if file_path.endswith(".py"):
         if not is_valid_python(fixed_code):
             print(f"⚠️ Invalid Python generated. Keeping original.")
             return current_code
         first_line = fixed_code.split("\n")[0].strip()
         if first_line.endswith(".py"):
-            print(f"⚠️ Bad output detected. Keeping original.")
-            return current_code
+            print(f"⚠️ Bad output detected. Stripping filename line.")
+            fixed_code = "\n".join(fixed_code.split("\n")[1:]).strip()
 
     return fixed_code
+
 
 def generate_diff(
     file_path: str,
